@@ -1,0 +1,71 @@
+# close-empty-pr-descriptions.yml
+# This workflow automatically closes pull requests that have an empty or whitespace-only description.
+# It also posts a comment to notify the creator about the closure.
+# -----------------------------------------------------------------------------
+    name: Close PRs with Empty Descriptions
+
+    on:
+     
+      schedule:
+        - cron: '21 21 * * *'
+      # Allows manual triggering from the GitHub Actions tab.
+      workflow_dispatch:
+    
+    jobs:
+      cancel-empty-pr:
+        runs-on: ubuntu-latest
+        # Set the permissions required for updating pull requests and posting comments.
+        permissions:
+          pull-requests: write
+          issues: write
+        steps:
+          - name: Close PRs without proper description
+            uses: actions/github-script@v6
+            with:
+              github-token: ${{ secrets.GITHUB_TOKEN }}
+              script: |
+                // Fetch all open pull requests using pagination.
+                const prs = await github.paginate(github.rest.pulls.list, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: "open"
+                });
+                
+                // If no open PRs are found, log a message and exit.
+                if (!prs || prs.length === 0) {
+                  console.log("No open pull requests found.");
+                  return;
+                }
+                
+                // Loop through each pull request.
+                for (const pr of prs) {
+                  // Check if the pull request's description (body) is empty or only whitespace.
+                  if (!pr.body || pr.body.trim().length === 0) {
+                    // Determine the username if available; if not, use 'unknown user'.
+                    const username = pr.user && pr.user.login ? pr.user.login : "unknown user";
+                    console.log(`PR #${pr.number} by ${username} has an empty description.`);
+                    
+                    // If valid user info exists, post a comment to notify the PR creator.
+                    if (pr.user && pr.user.login) {
+                      await github.rest.issues.createComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: pr.number,
+                        body: `@${pr.user.login}, your pull request has been closed because it does not include a description. Please update your PR with the necessary details and reopen it.`
+                      });
+                    } else {
+                      console.log(`PR #${pr.number} does not have valid user info; no comment will be posted.`);
+                    }
+                    
+                    // Close the pull request.
+                    await github.rest.pulls.update({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      pull_number: pr.number,
+                      state: "closed"
+                    });
+                    
+                    console.log(`PR #${pr.number} closed.`);
+                  }
+                }
+    
