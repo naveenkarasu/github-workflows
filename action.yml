@@ -1,6 +1,8 @@
 # close-empty-pr-descriptions.yml
+
 # This workflow automatically closes pull requests that have an empty or whitespace-only description.
 # It also posts a comment to notify the creator about the closure.
+
 # -----------------------------------------------------------------------------
     name: Close PRs with Empty Descriptions
 
